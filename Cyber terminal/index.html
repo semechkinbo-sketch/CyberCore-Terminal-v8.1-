@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>CyberCore Terminal v8.0 - FINAL</title>
+	<style>
+		@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+			user-select: none;
+			-webkit-user-select: none;
+			touch-action: none;
+		}
+
+		:root {
+			--theme-primary: #00ff9d;
+			--theme-secondary: #00aaff;
+			--theme-alert: #ff0055;
+			--theme-bg: #020405;
+			--theme-panel: rgba(2, 6, 8, 0.96);
+		}
+
+		body {
+			background-color: var(--theme-bg);
+			color: var(--theme-primary);
+			font-family: 'VT323', monospace;
+			height: 100vh;
+			width: 100vw;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			padding: 8px;
+			overflow: hidden;
+			position: relative;
+		}
+
+		/* --- КОНТРАСТНЫЙ CRT-МОДУЛЬ --- */
+		.screen-overlay {
+			position: fixed;
+			inset: 0;
+			background: 
+				linear-gradient(rgba(0, 255, 157, 0.02) 1px, transparent 1px),
+				linear-gradient(90deg, rgba(0, 255, 157, 0.02) 1px, transparent 1px);
+			background-size: 16px 16px;
+			pointer-events: none;
+			z-index: 100;
+		}
+
+		.scanlines {
+			position: fixed;
+			inset: 0;
+			background: linear-gradient(
+				rgba(0, 0, 0, 0) 0%, 
+				rgba(0, 0, 0, 0) 50%, 
+				rgba(0, 0, 0, 0.35) 50%, 
+				rgba(0, 0, 0, 0.35) 100%
+			);
+			background-size: 100% 6px;
+			pointer-events: none;
+			z-index: 101;
+		}
+
+		.vignette {
+			position: fixed;
+			inset: 0;
+			background: radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(0,0,0,0.75) 100%);
+			pointer-events: none;
+			z-index: 102;
+		}
+
+		/* --- ИНТЕРФЕЙС ТЕРМИНАЛА --- */
+		.terminal-container {
+			width: 100%;
+			max-width: 415px;
+			height: 100%;
+			max-height: calc(100vh - 16px);
+			background: var(--theme-panel);
+			border: 2px solid var(--theme-secondary);
+			box-shadow: 0 0 25px rgba(0, 170, 255, 0.2);
+			padding: 10px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			overflow: hidden;
+			position: relative;
+			z-index: 5;
+		}
+
+		.terminal-header {
+			border: 1px dashed var(--theme-secondary);
+			padding: 6px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			flex-shrink: 0;
+		}
+
+		.terminal-header h1 {
+			font-size: 14px;
+			color: var(--theme-secondary);
+			text-shadow: 0 0 4px var(--theme-secondary);
+		}
+
+		.cyber-clock { font-family: monospace; font-size: 11px; }
+
+		.dashboard-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			grid-template-rows: auto minmax(180px, 1.5fr) auto minmax(130px, 1fr);
+			gap: 8px;
+			flex-grow: 1;
+			min-height: 0; 
+		}
+
+		.module {
+			background: rgba(0, 2, 4, 0.9);
+			border: 1px solid currentColor;
+			padding: 8px;
+			display: flex;
+			flex-direction: column;
+			justify-content: space-between;
+			overflow: hidden;
+			position: relative;
+		}
+
+		.mod-title {
+			font-family: 'Press Start 2P', monospace;
+			font-size: 8px;
+			letter-spacing: 0.5px;
+			margin-bottom: 6px;
+			flex-shrink: 0;
+		}
+
+		.engineering-controls { 
+			display: flex; 
+			flex-direction: column; 
+			gap: 6px;
+		}
+		.control-row { 
+			display: flex; 
+			flex-direction: column; 
+			gap: 2px;
+		}
+		.control-label { font-size: 12px; display: flex; justify-content: space-between; }
+
+		.range-container {
+			padding: 6px 0; 
+		}
+
+		.cyber-range {
+			-webkit-appearance: none;
+			width: 100%;
+			height: 4px; 
+			background: #111;
+			border: 1px solid currentColor;
+			outline: none;
+			display: block;
+		}
+		
+		.cyber-range::-webkit-slider-thumb {
+			-webkit-appearance: none;
+			width: 10px; 
+			height: 14px; 
+			background: currentColor;
+			cursor: pointer;
+			box-shadow: 0 0 4px currentColor;
+		}
+
+		.toggles-group { display: flex; justify-content: space-between; gap: 6px; margin-top: 4px; }
+		.toggle-btn {
+			flex: 1; background: transparent; border: 1px solid rgba(255,255,255,0.15);
+			color: rgba(255,255,255,0.3); font-family: monospace; font-size: 10px; padding: 4px;
+			cursor: pointer;
+		}
+		.toggle-btn.active {
+			border-color: var(--theme-primary); color: var(--theme-primary); background: rgba(0, 255, 157, 0.08);
+		}
+
+		.btn-preset {
+			width: 100%; background: var(--theme-secondary); color: #000; border: none;
+			font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 6px; font-weight: bold;
+			cursor: pointer;
+		}
+
+		.matrix-log {
+			font-family: monospace; font-size: 11px; line-height: 1.2;
+			flex-grow: 1; overflow: hidden; display: flex; flex-direction: column;
+			justify-content: flex-end; background: rgba(0,0,0,0.4); padding: 4px;
+		}
+
+		.btn-action {
+			background: transparent; border: 1px solid currentColor; color: inherit;
+			padding: 4px; font-family: 'Press Start 2P', monospace; font-size: 7px;
+			flex-shrink: 0; cursor: pointer;
+		}
+
+		/* ЦЕНТРАЛЬНЫЙ БЛОК РЕАКТОРА */
+		.core-protocol {
+			grid-column: span 2;
+			border: 1px solid var(--theme-secondary);
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 8px 12px;
+			position: relative;
+			overflow: hidden;
+		}
+
+		#coreCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+		.core-info-block { display: flex; flex-direction: column; width: 32%; z-index: 2; pointer-events: none; }
+		.core-info-block.align-right { text-align: right; align-items: flex-end; }
+		.core-info-label { font-size: 10px; opacity: 0.5; font-family: monospace; }
+		.core-info-value { font-size: 16px; font-weight: bold; color: #fff; }
+
+		.reactor-core-housing {
+			width: 130px; 
+			height: 130px; 
+			position: relative;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			z-index: 2;
+			pointer-events: none;
+		}
+
+		.magnetic-ring { position: absolute; width: 100%; height: 100%; border: 1px dashed var(--theme-secondary); border-radius: 50%; }
+		.core-stabilizer-hub { position: absolute; width: 60%; height: 60%; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+		.core-stabilizer-hub span:nth-child(1) { font-family: 'Press Start 2P', monospace; font-size: 7px; color: #fff; opacity: 0.7; }
+		.core-stabilizer-hub span:nth-child(2) { font-size: 16px; font-weight: bold; margin-top: 2px; }
+
+		/* ИНЖЕНЕРНАЯ ПАНЕЛЬ ЗАМКОВ-ЧЕКПОИНТОВ */
+		.lock-protocol-bar {
+			grid-column: span 2;
+			display: flex;
+			gap: 6px;
+			flex-shrink: 0;
+			position: relative;
+			height: 28px;
+		}
+
+		.lock-btn {
+			flex: 1;
+			background: rgba(255, 255, 255, 0.02);
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			color: rgba(255, 255, 255, 0.2);
+			font-family: 'Press Start 2P', monospace;
+			font-size: 6.5px;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			font-weight: bold;
+			transition: all 0.2s;
+			cursor: pointer;
+		}
+
+		.lock-btn.ready-l1 { border-color: #00aaff; color: #00aaff; background: rgba(0, 170, 255, 0.15); box-shadow: 0 0 8px rgba(0, 170, 255, 0.2); }
+		.lock-btn.ready-l2 { border-color: #ffcc00; color: #ffcc00; background: rgba(255, 204, 0, 0.15); box-shadow: 0 0 8px rgba(255, 204, 0, 0.2); }
+		.lock-btn.ready-l3 { border-color: var(--theme-alert); color: var(--theme-alert); background: rgba(255, 0, 85, 0.15); box-shadow: 0 0 8px rgba(255, 0, 85, 0.2); }
+
+		.lock-btn.secured {
+			background: #00ff9d !important;
+			border-color: #00ff9d !important;
+			color: #000 !important;
+			box-shadow: 0 0 10px rgba(0, 255, 157, 0.4);
+		}
+
+		.reset-trigger-btn {
+			position: absolute;
+			inset: 0;
+			background: var(--theme-alert);
+			color: #fff;
+			border: 1px solid #fff;
+			font-family: 'Press Start 2P', monospace;
+			font-size: 9px;
+			font-weight: bold;
+			display: none;
+			justify-content: center;
+			align-items: center;
+			letter-spacing: 1px;
+			z-index: 10;
+			cursor: pointer;
+		}
+
+		.interactive-pad { flex-grow: 1; width: 100%; background: #010203; border: 1px solid rgba(255,255,255,0.02); position: relative; overflow: hidden; margin-bottom: 6px; }
+		.interactive-pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+		.pad-hint-text { position: absolute; bottom: 4px; width: 100%; text-align: center; font-size: 10px; opacity: 0.2; pointer-events: none; }
+
+		.pad-trigger-btn {
+			width: 100%;
+			background: transparent;
+			border: 1px solid currentColor;
+			color: inherit;
+			font-family: 'Press Start 2P', monospace;
+			font-size: 8px;
+			padding: 8px 4px;
+			font-weight: bold;
+			flex-shrink: 0;
+			cursor: pointer;
+		}
+		.pad-trigger-btn:active {
+			background: currentColor;
+			color: #000;
+		}
+
+		.footer-status { border-top: 1px solid var(--theme-secondary); padding-top: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; flex-shrink: 0; }
+		.blink-text { animation: statusBlink 1s infinite steps(2); }
+		@keyframes statusBlink { 0% { opacity: 0.2; } 100% { opacity: 1; } }
+	</style>
+</head>
+<body>
+
+	<div class="screen-overlay" id="crtGrid"></div>
+	<div class="scanlines"></div>
+	<div class="vignette"></div>
+
+	<div class="terminal-container" id="terminalMain">
+		
+		<header class="terminal-header">
+			<h1>// CYBERCORE_TERMINAL_v8.0</h1>
+			<div class="cyber-clock" id="clock">00:00:00</div>
+		</header>
+
+		<main class="dashboard-grid">
+			
+			<section class="module" style="color: var(--theme-secondary);">
+				<div class="mod-title" id="themeLabel">PRESET: CYBERPUNK</div>
+				<div class="engineering-controls">
+					<button class="btn-preset" id="nextPresetBtn">NEXT PRESET</button>
+					<div class="control-row">
+						<div class="control-label"><span>REACTOR VISUAL</span><span id="vFreq">1.0x</span></div>
+						<div class="range-container">
+							<input type="range" id="freqSlider" class="cyber-range" min="5" max="35" value="10">
+						</div>
+					</div>
+					<div class="control-row">
+						<div class="control-label"><span>PAD TONE</span><span id="vNoise">BASE</span></div>
+						<div class="range-container">
+							<input type="range" id="noiseSlider" class="cyber-range" min="100" max="1500" value="440">
+						</div>
+					</div>
+					<div class="toggles-group">
+						<button class="toggle-btn active" id="toggleAudio">SOUND</button>
+						<button class="toggle-btn active" id="toggleCRT">CRT</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="module" style="color: var(--theme-primary);">
+				<div class="mod-title">DIAGNOSTIC LOG</div>
+				<div class="matrix-log" id="matrixLog"></div>
+				<button class="btn-action" id="clearLogBtn">CLEAR LOG</button>
+			</section>
+
+			<section class="core-protocol" id="reactorCoreBlock">
+				<canvas id="coreCanvas"></canvas>
+				
+				<div class="core-info-block">
+					<div class="core-info-label">SYS_STABILITY:</div>
+					<div class="core-info-value" id="stabilityVal">100.0%</div>
+				</div>
+				
+				<div class="reactor-core-housing">
+					<div class="magnetic-ring" id="magneticRing"></div>
+					<div class="core-stabilizer-hub">
+						<span>SYS</span>
+						<span id="rpmVal" style="color: var(--theme-primary);">0.0%</span>
+					</div>
+				</div>
+
+				<div class="core-info-block align-right">
+					<div class="core-info-label">MIN_BASE:</div>
+					<div class="core-info-value" id="floorVal" style="color: var(--theme-secondary);">0.0%</div>
+				</div>
+			</section>
+
+			<div class="lock-protocol-bar">
+				<div class="lock-btn" id="lock1">HOLD >300</div>
+				<div class="lock-btn" id="lock2">HOLD >600</div>
+				<div class="lock-btn" id="lock3">HOLD >900</div>
+				<div class="reset-trigger-btn" id="resetTrigger">[ SYSTEM PURGE / RESET ]</div>
+			</div>
+
+			<section class="module" style="color: var(--theme-primary);">
+				<div class="mod-title" id="injTouchCount">QUANTUM INJECTOR</div>
+				<div class="interactive-pad" id="injectorPad">
+					<canvas id="injectorCanvas"></canvas>
+					<div class="pad-hint-text">[ MULTI-TAP INJECT ]</div>
+				</div>
+				<button class="pad-trigger-btn" id="pulseInjectBtn">PULSE INJECTION</button>
+			</section>
+
+			<section class="module" style="color: #ffcc00;">
+				<div class="mod-title" id="radTouchCount">MATRIX LOCATOR</div>
+				<div class="interactive-pad" id="radarPad">
+					<canvas id="radarCanvas"></canvas>
+					<div class="pad-hint-text">[ MULTI-TAP SONAR ]</div>
+				</div>
+				<button class="pad-trigger-btn" id="pingNodeBtn">PING NODE</button>
+			</section>
+
+		</main>
+
+		<footer class="footer-status">
+			<div>MULTITOUCH_BUS: <span style="color:#fff;" id="activeTouchesGlobal">0 ACTIVE</span></div>
+			<div class="blink-text" style="color: var(--theme-alert);" id="syncIndicator">STANDBY</div>
+		</footer>
+
+	</div>
+
+	<script>
+		// --- ЧАСЫ ---
+		const clockEl = document.getElementById('clock');
+		setInterval(() => {
+			const now = new Date();
+			clockEl.textContent = now.toTimeString().split(' ')[0] + ':' + String(now.getMilliseconds()).padStart(3,'0').substring(0,2);
+		}, 30);
+
+		// --- ЗВУКОВАЯ СИСТЕМА С ПРИНУДИТЕЛЬНОЙ АКТИВАЦИЕЙ ---
+		const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+		let audioEnabled = true;
+
+		function unlockAudioModule() {
+			if (audioCtx.state === 'suspended') {
+				audioCtx.resume().then(() => {
+					printLog("AUDIO_BUS: LIVE");
+					window.removeEventListener('touchstart', unlockAudioModule);
+					window.removeEventListener('pointerdown', unlockAudioModule);
+				});
+			}
+		}
+		window.addEventListener('touchstart', unlockAudioModule, { passive: true });
+		window.addEventListener('pointerdown', unlockAudioModule, { passive: true });
+
+		function playSynthTone(freq, type = 'square', duration = 0.04, vol = 0.03) {
+			if (!audioEnabled) return;
+			try {
+				if (audioCtx.state === 'suspended') audioCtx.resume();
+				
+				const osc = audioCtx.createOscillator();
+				const gain = audioCtx.createGain();
+				osc.connect(gain); gain.connect(audioCtx.destination);
+				osc.type = type;
+				osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+				gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+				gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+				osc.start(); osc.stop(audioCtx.currentTime + duration);
+			} catch(e){}
+		}
+
+		function playResetSirens() {
+			if (!audioEnabled) return;
+			let time = audioCtx.currentTime;
+			for(let i=0; i<8; i++) {
+				const osc = audioCtx.createOscillator();
+				const gain = audioCtx.createGain();
+				osc.connect(gain); gain.connect(audioCtx.destination);
+				osc.type = 'sawtooth';
+				osc.frequency.setValueAtTime(500 - (i * 60), time + (i * 0.08));
+				gain.gain.setValueAtTime(0.06, time + (i * 0.08));
+				gain.gain.exponentialRampToValueAtTime(0.001, time + (i * 0.08) + 0.08);
+				osc.start(time + (i * 0.08)); osc.stop(time + (i * 0.08) + 0.08);
+			}
+		}
+
+		function playClearLogSound() {
+			if (!audioEnabled) return;
+			try {
+				if (audioCtx.state === 'suspended') audioCtx.resume();
+				const time = audioCtx.currentTime;
+				const osc = audioCtx.createOscillator();
+				const gain = audioCtx.createGain();
+				osc.connect(gain); gain.connect(audioCtx.destination);
+				osc.type = 'sawtooth';
+				osc.frequency.setValueAtTime(800, time);
+				osc.frequency.exponentialRampToValueAtTime(150, time + 0.12);
+				gain.gain.setValueAtTime(0.04, time);
+				gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+				osc.start(); osc.stop(time + 0.12);
+			} catch(e){}
+		}
+
+		// --- ЛОГ СИСТЕМЫ ---
+		const matrixLog = document.getElementById('matrixLog');
+		function printLog(text) {
+			const div = document.createElement('div');
+			div.textContent = `> ${text}`;
+			matrixLog.appendChild(div);
+			if(matrixLog.childNodes.length > 5) matrixLog.removeChild(matrixLog.firstChild);
+		}
+
+		// --- ПОЛЗУНКИ НАСТРОЕК (С АУДИО-ДРОССЕЛЕМ) ---
+		let visualMultiplier = 1.0; 
+		let customPadTone = 440;	 
+		
+		let lastFreqSoundTime = 0;
+		let lastNoiseSoundTime = 0;
+
+		const freqSlider = document.getElementById('freqSlider');
+		freqSlider.addEventListener('input', (e) => { 
+			visualMultiplier = e.target.value / 10;
+			document.getElementById('vFreq').textContent = `${visualMultiplier.toFixed(1)}x`; 
+			
+			const now = performance.now();
+			if (now - lastFreqSoundTime > 40) {
+				playSynthTone(90 + (visualMultiplier * 70), 'triangle', 0.015, 0.025);
+				lastFreqSoundTime = now;
+			}
+		});
+
+		const noiseSlider = document.getElementById('noiseSlider');
+		noiseSlider.addEventListener('input', (e) => {
+			customPadTone = parseInt(e.target.value);
+			let displayLabel = "BASE";
+			if(customPadTone < 350) displayLabel = "LOW";
+			else if(customPadTone > 900) displayLabel = "HIGH";
+			else if(customPadTone > 550) displayLabel = "MID";
+			document.getElementById('vNoise').textContent = `${customPadTone}Hz (${displayLabel})`;
+			
+			const now = performance.now();
+			if (now - lastNoiseSoundTime > 25) {
+				playSynthTone(customPadTone * 0.35, 'sine', 0.012, 0.02);
+				lastNoiseSoundTime = now;
+			}
+		});
+
+		// --- ЦВЕТОВЫЕ ПРЕСЕТЫ ---
+		const themeColors = {
+			'CYBERPUNK': { primary: '#00ff9d', secondary: '#00aaff', alert: '#ff0055', bg: '#020405' },
+			'MATRIX': { primary: '#00ff33', secondary: '#004400', alert: '#00ff66', bg: '#010301' },
+			'TERMINATOR': { primary: '#ff0000', secondary: '#330000', alert: '#ff5555', bg: '#050000' },
+			'ROBOCOP': { primary: '#99b3ff', secondary: '#ff6600', alert: '#ffcc00', bg: '#020305' }
+		};
+		const themes = Object.keys(themeColors);
+		let currentThemeIdx = 0;
+
+		document.getElementById('nextPresetBtn').addEventListener('click', () => {
+			currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+			const name = themes[currentThemeIdx];
+			const colors = themeColors[name];
+			document.documentElement.style.setProperty('--theme-primary', colors.primary);
+			document.documentElement.style.setProperty('--theme-secondary', colors.secondary);
+			document.documentElement.style.setProperty('--theme-alert', colors.alert);
+			document.documentElement.style.setProperty('--theme-bg', colors.bg);
+			document.getElementById('themeLabel').textContent = `PRESET: ${name}`;
+			printLog(`THEME_SHIFT: ${name}`);
+			playSynthTone(customPadTone, 'sine');
+			setupPlasmaVortex();
+		});
+
+		document.getElementById('clearLogBtn').addEventListener('click', () => { 
+			matrixLog.innerHTML = ''; 
+			playClearLogSound(); 
+			printLog("LOG_RESET"); 
+		});
+		
+		const toggleAudio = document.getElementById('toggleAudio');
+		toggleAudio.addEventListener('click', () => { audioEnabled = !audioEnabled; toggleAudio.classList.toggle('active', audioEnabled); });
+		
+		const toggleCRT = document.getElementById('toggleCRT');
+		toggleCRT.addEventListener('click', () => {
+			const grid = document.getElementById('crtGrid');
+			const scanlines = document.querySelector('.scanlines');
+			const vignette = document.querySelector('.vignette');
+			const isVisible = grid.style.display !== 'none';
+			
+			if (isVisible) {
+				grid.style.display = 'none';
+				if(scanlines) scanlines.style.display = 'none';
+				if(vignette) vignette.style.display = 'none';
+				toggleCRT.classList.remove('active');
+				printLog("CRT_FILTER: OFF");
+			} else {
+				grid.style.display = 'block';
+				if(scanlines) scanlines.style.display = 'block';
+				if(vignette) vignette.style.display = 'block';
+				toggleCRT.classList.add('active');
+				printLog("CRT_FILTER: ON");
+			}
+		});
+
+		// =======================================================
+		// РЕАКТОР И СИСТЕМА СКОРОСТНЫХ ЧЕКПОИНТОВ
+		// =======================================================
+		const coreCanvas = document.getElementById('coreCanvas');
+		const coreCtx = coreCanvas.getContext('2d');
+		const reactorCoreBlock = document.getElementById('reactorCoreBlock');
+		const magneticRing = document.getElementById('magneticRing');
+		const rpmVal = document.getElementById('rpmVal');
+		const stabilityVal = document.getElementById('stabilityVal');
+		const floorVal = document.getElementById('floorVal');
+		const resetBtn = document.getElementById('resetTrigger');
+
+		let currentCharge = 0.0;
+		let targetCharge = 0.0;
+		let currentFloor = 0.0; 
+		let ringAngle = 0;
+		let coreParticles = [];
+		let isCoolingDown = false;
+
+		let locksSecured = { lock1: false, lock2: false, lock3: false };
+
+		const lBtn1 = document.getElementById('lock1');
+		const lBtn2 = document.getElementById('lock2');
+		const lBtn3 = document.getElementById('lock3');
+
+		function resizeAllCanvases() {
+			coreCanvas.width = reactorCoreBlock.clientWidth;
+			coreCanvas.height = reactorCoreBlock.clientHeight;
+			injectorCanvas.width = injectorPad.clientWidth;
+			injectorCanvas.height = injectorPad.clientHeight;
+			radarCanvas.width = radarPad.clientWidth;
+			radarCanvas.height = radarPad.clientHeight;
+		}
+		window.addEventListener('resize', resizeAllCanvases);
+
+		class PlasmaVortex {
+			constructor(cx, cy, radius, speed, angle, size, color) {
+				this.cx = cx; this.cy = cy;
+				this.radius = radius; this.speed = speed;
+				this.angle = angle; this.size = size; this.color = color;
+			}
+			update(charge) {
+				if (isCoolingDown) {
+					this.angle += this.speed * 0.5 * visualMultiplier;
+					this.radius += 5.0; 
+				} else {
+					this.angle += this.speed * (1 + charge * 0.02) * visualMultiplier;
+					let shrinkSpeed = 0.25 * (1 + charge * 0.005) * (0.3 + visualMultiplier * 0.5);
+					this.radius -= shrinkSpeed;
+					if (this.radius <= 4) {
+						this.radius = Math.random() * 50 + 75;
+					}
+				}
+			}
+			draw() {
+				coreCtx.fillStyle = this.color;
+				const px = this.cx + Math.cos(this.angle) * this.radius;
+				const py = this.cy + Math.sin(this.angle) * this.radius;
+				coreCtx.fillRect(px, py, this.size, this.size);
+			}
+		}
+
+		function setupPlasmaVortex() {
+			const cx = coreCanvas.width / 2;
+			const cy = coreCanvas.height / 2;
+			coreParticles = [];
+			const pColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim();
+			const sColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-secondary').trim();
+			for(let i=0; i<180; i++) {
+				coreParticles.push(new PlasmaVortex(
+					cx, cy, Math.random() * 80 + 40,
+					Math.random() * 0.02 + 0.005, Math.random() * Math.PI * 2,
+					Math.random() * 2 + 1, Math.random() > 0.4 ? pColor : sColor
+				));
+			}
+		}
+
+		reactorCoreBlock.addEventListener('pointerdown', () => {
+			if(isCoolingDown) return;
+			targetCharge += 20.0;
+			if(targetCharge > 1000.0) targetCharge = 1000.0;
+			playSynthTone(customPadTone * 0.7 + currentCharge * 0.5, 'triangle', 0.05, 0.06);
+		});
+
+		function setupCheckpointSystem() {
+			lBtn1.addEventListener('pointerdown', () => {
+				if(!locksSecured.lock1 && currentCharge >= 300.0 && !isCoolingDown) {
+					locksSecured.lock1 = true;
+					currentFloor = 300.0; 
+					lBtn1.className = 'lock-btn secured';
+					printLog("CHECKPOINT_01: LOCKED (MIN 300%)");
+					playSynthTone(customPadTone * 1.2, 'sawtooth', 0.15, 0.06);
+				}
+			});
+
+			lBtn2.addEventListener('pointerdown', () => {
+				if(locksSecured.lock1 && !locksSecured.lock2 && currentCharge >= 600.0 && !isCoolingDown) {
+					locksSecured.lock2 = true;
+					currentFloor = 600.0; 
+					lBtn2.className = 'lock-btn secured';
+					printLog("CHECKPOINT_02: LOCKED (MIN 600%)");
+					playSynthTone(customPadTone * 1.6, 'sawtooth', 0.15, 0.06);
+				}
+			});
+
+			lBtn3.addEventListener('pointerdown', () => {
+				if(locksSecured.lock2 && !locksSecured.lock3 && currentCharge >= 900.0 && !isCoolingDown) {
+					locksSecured.lock3 = true;
+					currentFloor = 900.0; 
+					lBtn3.className = 'lock-btn secured';
+					printLog("FINAL_CHECKPOINT: ACQUIRED!");
+					playSynthTone(customPadTone * 2.2, 'sawtooth', 0.2, 0.08);
+					resetBtn.style.display = 'flex';
+				}
+			});
+
+			resetBtn.addEventListener('pointerdown', () => {
+				isCoolingDown = true;
+				targetCharge = 0.0;
+				currentFloor = 0.0;
+				resetBtn.style.display = 'none';
+				printLog("SYSTEM_PURGE: WIPING PROGRESS...");
+				playResetSirens();
+			});
+		}
+
+		function restoreSystemToDefault() {
+			isCoolingDown = false;
+			locksSecured = { lock1: false, lock2: false, lock3: false };
+			currentFloor = 0.0;
+			lBtn1.className = 'lock-btn';
+			lBtn2.className = 'lock-btn';
+			lBtn3.className = 'lock-btn';
+			matrixLog.innerHTML = '';
+			printLog("SYSTEM_READY_LEVEL_01");
+			setupPlasmaVortex();
+		}
+
+		// =======================================================
+		// ТАЧ-ПАДЫ
+		// =======================================================
+		const injectorPad = document.getElementById('injectorPad');
+		const injectorCanvas = document.getElementById('injectorCanvas');
+		const injCtx = injectorCanvas.getContext('2d');
+		let injectorTouches = {};
+		let plasmoids = [];
+
+		function handleInjectorTouch(e) {
+			e.preventDefault();
+			if (isCoolingDown) return;
+			const rect = injectorPad.getBoundingClientRect();
+			injectorTouches = {};
+			if(e.targetTouches === undefined) {
+				if(e.type === 'pointerdown' || e.type === 'pointermove') {
+					injectorTouches['mouse'] = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+					if(e.type === 'pointerdown') launchPlasmoid(e.clientX - rect.left, e.clientY - rect.top);
+				}
+			} else {
+				for(let i=0; i<e.targetTouches.length; i++) {
+					const t = e.targetTouches[i];
+					injectorTouches[t.identifier] = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+					if(e.type === 'touchstart') launchPlasmoid(t.clientX - rect.left, t.clientY - rect.top);
+				}
+			}
+			updateGlobalTouchBus();
+		}
+
+		function launchPlasmoid(x, y) {
+			if(isCoolingDown) return;
+			targetCharge += 35.0;
+			if(targetCharge > 1000.0) targetCharge = 1000.0;
+			plasmoids.push({ x: x, y: y, tx: injectorCanvas.width / 2, ty: 0 });
+			playSynthTone(customPadTone * 0.5, 'square');
+		}
+
+		injectorPad.addEventListener('touchstart', handleInjectorTouch);
+		injectorPad.addEventListener('touchmove', handleInjectorTouch);
+		injectorPad.addEventListener('touchend', handleInjectorTouch);
+		injectorPad.addEventListener('pointerdown', handleInjectorTouch);
+
+		document.getElementById('pulseInjectBtn').addEventListener('click', () => {
+			launchPlasmoid(Math.random() * injectorCanvas.width, injectorCanvas.height - 10);
+		});
+
+		const radarPad = document.getElementById('radarPad');
+		const radarCanvas = document.getElementById('radarCanvas');
+		const radCtx = radarCanvas.getContext('2d');
+		let radarTouches = {};
+		let radarWaves = [];
+		let sweepY = 0;
+
+		function handleRadarTouch(e) {
+			e.preventDefault();
+			if (isCoolingDown) return;
+			const rect = radarPad.getBoundingClientRect();
+			radarTouches = {};
+			if(e.targetTouches === undefined) {
+				if(e.type === 'pointerdown' || e.type === 'pointermove') {
+					radarTouches['mouse'] = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+					if(e.type === 'pointerdown') emitRadarWave(e.clientX - rect.left, e.clientY - rect.top);
+				}
+			} else {
+				for(let i=0; i<e.targetTouches.length; i++) {
+					const t = e.targetTouches[i];
+					radarTouches[t.identifier] = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+					if(e.type === 'touchstart') emitRadarWave(t.clientX - rect.left, t.clientY - rect.top);
+				}
+			}
+			updateGlobalTouchBus();
+		}
+
+		function emitRadarWave(x, y) {
+			if(isCoolingDown) return;
+			radarWaves.push({ x: x, y: y, radius: 1, maxRadius: 60 });
+			targetCharge += 25.0;
+			if(targetCharge > 1000.0) targetCharge = 1000.0;
+			playSynthTone(customPadTone * 1.5, 'sine');
+		}
+
+		radarPad.addEventListener('touchstart', handleRadarTouch);
+		radarPad.addEventListener('touchmove', handleRadarTouch);
+		radarPad.addEventListener('touchend', handleRadarTouch);
+		radarPad.addEventListener('pointerdown', handleRadarTouch);
+
+		document.getElementById('pingNodeBtn').addEventListener('click', () => {
+			emitRadarWave(radarCanvas.width / 2, radarCanvas.height / 2);
+		});
+
+		function updateGlobalTouchBus() {
+			const injCount = Object.keys(injectorTouches).length;
+			const radCount = Object.keys(radarTouches).length;
+			document.getElementById('activeTouchesGlobal').textContent = `${injCount + radCount} ACTIVE INPUTS`;
+		}
+
+		// =======================================================
+		// ЦИКЛ ДВИЖКА СИМУЛЯЦИИ (60 FPS)
+		// =======================================================
+		function executionEngineFrame() {
+			if (isCoolingDown) {
+				currentCharge += (0 - currentCharge) * 0.08;
+				if (currentCharge <= 0.5) {
+					currentCharge = 0;
+					restoreSystemToDefault();
+				}
+			} else {
+				currentCharge += (targetCharge - currentCharge) * 0.05;
+				
+				const activeInjections = Object.keys(injectorTouches).length;
+				const activeScans = Object.keys(radarTouches).length;
+				const totalCatalysts = activeInjections + activeScans;
+
+				const dissipationRate = Math.max(0.1, 0.8 + (currentCharge * 0.002) - (totalCatalysts * 0.3));
+				targetCharge -= dissipationRate;
+
+				if (targetCharge < currentFloor) targetCharge = currentFloor;
+				if (currentCharge < currentFloor) currentCharge = currentFloor;
+			}
+
+			rpmVal.textContent = `${currentCharge.toFixed(1)}%`;
+			floorVal.textContent = `${currentFloor.toFixed(0)}%`;
+			
+			const stabilityIdx = isCoolingDown ? (currentCharge / 10) : Math.max(0, 100 - (currentCharge * 0.095) + (currentFloor * 0.09));
+			stabilityVal.textContent = `${stabilityIdx.toFixed(1)}%`;
+
+			if (isCoolingDown) {
+				document.getElementById('syncIndicator').textContent = 'VENTING_PLASMA';
+			} else {
+				if (!locksSecured.lock1) {
+					if (currentCharge >= 300.0) lBtn1.className = 'lock-btn ready-l1';
+					else lBtn1.className = 'lock-btn';
+				}
+				if (!locksSecured.lock2) {
+					if (locksSecured.lock1 && currentCharge >= 600.0) lBtn2.className = 'lock-btn ready-l2';
+					else lBtn2.className = 'lock-btn';
+				}
+				if (!locksSecured.lock3) {
+					if (locksSecured.lock2 && currentCharge >= 900.0) lBtn3.className = 'lock-btn ready-l3';
+					else lBtn3.className = 'lock-btn';
+				}
+
+				if(locksSecured.lock3) {
+					document.getElementById('syncIndicator').textContent = 'SYS_STABILIZED';
+				} else if(currentCharge >= 900.0) {
+					document.getElementById('syncIndicator').textContent = 'WARN: OVERLOAD';
+				} else {
+					document.getElementById('syncIndicator').textContent = currentFloor > 0 ? `LOCKED_LVL_${currentFloor/300}` : 'STANDBY';
+				}
+			}
+
+			ringAngle += ((currentCharge * 0.03) + 0.15) * visualMultiplier;
+			magneticRing.style.transform = `rotate(${ringAngle}deg)`;
+
+			coreCtx.clearRect(0, 0, coreCanvas.width, coreCanvas.height);
+			const cx = coreCanvas.width / 2;
+			const cy = coreCanvas.height / 2;
+
+			if (currentCharge > 0) {
+				coreCtx.strokeStyle = isCoolingDown ? 'var(--theme-secondary)' : (currentCharge > 800 ? 'var(--theme-alert)' : 'var(--theme-secondary)');
+				coreCtx.lineWidth = 3;
+				coreCtx.beginPath();
+				const endArcAngle = -Math.PI/2 + (Math.PI * 2 * (currentCharge / 1000));
+				coreCtx.arc(cx, cy, 58, -Math.PI/2, endArcAngle);
+				coreCtx.stroke(); // Метод полностью исправлен
+			}
+
+			if (coreParticles.length === 0 && coreCanvas.width > 0) setupPlasmaVortex();
+			coreParticles.forEach(p => {
+				p.update(currentCharge);
+				p.draw();
+			});
+
+			if(currentCharge > 850.0 && !locksSecured.lock3 && Math.random() < 0.2) {
+				document.getElementById('terminalMain').style.transform = `translate(${Math.random()*4-2}px, ${Math.random()*4-2}px)`;
+			} else {
+				document.getElementById('terminalMain').style.transform = 'none';
+			}
+
+			injCtx.clearRect(0, 0, injectorCanvas.width, injectorCanvas.height);
+			injCtx.fillStyle = 'rgba(0, 255, 157, 0.15)';
+			Object.keys(injectorTouches).forEach(id => {
+				const t = injectorTouches[id];
+				injCtx.beginPath(); injCtx.arc(t.x, t.y, 14, 0, Math.PI*2); injCtx.fill();
+			});
+
+			for(let i = plasmoids.length - 1; i >= 0; i--) {
+				const p = plasmoids[i];
+				const dx = p.tx - p.x; const dy = p.ty - p.y;
+				const dist = Math.sqrt(dx*dx + dy*dy);
+				if(dist < 6) { plasmoids.splice(i, 1); } else {
+					p.x += (dx / dist) * 7; p.y += (dy / dist) * 7;
+					injCtx.fillStyle = '#fff'; injCtx.fillRect(p.x - 2, p.y - 2, 4, 4);
+				}
+			}
+
+			radCtx.clearRect(0, 0, radarCanvas.width, radarCanvas.height);
+			radCtx.fillStyle = 'rgba(255, 204, 0, 0.12)';
+			Object.keys(radarTouches).forEach(id => {
+				const t = radarTouches[id];
+				radCtx.beginPath(); radCtx.arc(t.x, t.y, 14, 0, Math.PI*2); radCtx.fill();
+			});
+
+			sweepY += 1.2;
+			if(sweepY > radarCanvas.height) sweepY = 0;
+			radCtx.strokeStyle = 'rgba(255, 204, 0, 0.08)';
+			radCtx.beginPath(); radCtx.moveTo(0, sweepY); radCtx.lineTo(radarCanvas.width, sweepY); radCtx.stroke();
+
+			for(let i = radarWaves.length - 1; i >= 0; i--) {
+				const w = radarWaves[i];
+				w.radius += 2;
+				if(w.radius >= w.maxRadius) { radarWaves.splice(i, 1); } else {
+					radCtx.strokeStyle = '#ffcc00'; radCtx.globalAlpha = 1 - (w.radius / w.maxRadius);
+					radCtx.beginPath(); radCtx.arc(w.x, w.y, w.radius, 0, Math.PI*2); 
+					radCtx.stroke(); 
+					radCtx.globalAlpha = 1;
+				}
+			}
+
+			requestAnimationFrame(executionEngineFrame);
+		}
+
+		setTimeout(() => {
+			resizeAllCanvases();
+			setupPlasmaVortex();
+			setupCheckpointSystem();
+			requestAnimationFrame(executionEngineFrame);
+		}, 100);
+		// --- WELCOME MESSAGE ---
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        alert("📟 CYBERCORE TERMINAL v8.0\n\nWelcome to the Reactor Control System. A high-performance interface powered by Web Audio API and HTML5 Canvas.");
+        
+        setTimeout(() => {
+            alert("🎮 INSTRUCTIONS:\n1. Tap anywhere to initialize the Audio Bus.\n2. Hold checkpoint buttons to lock energy levels.\n3. Your objective: Stabilize the core at 900% capacity.");
+        }, 500);
+    }, 1000);
+});
+	</script>
+</body>
+</html>
